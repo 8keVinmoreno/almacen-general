@@ -1,0 +1,5 @@
+data/inventarios.db
+__pycache__/
+*.pyc
+.vscode/
+.env
