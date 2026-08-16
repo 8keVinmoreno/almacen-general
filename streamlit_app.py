@@ -1,5 +1,3 @@
-import os
-
 import streamlit as st
 import pandas as pd
 
@@ -31,8 +29,6 @@ st.set_page_config(
 
 crear_base_datos()
 
-RUTA_EXCEL = "data/archivos_excel/inventario.xlsx"
-
 
 # ==================================================
 # SESSION STATE
@@ -43,21 +39,6 @@ if "inventario" not in st.session_state:
 
 if "nombre_archivo" not in st.session_state:
     st.session_state.nombre_archivo = None
-
-
-# ==================================================
-# CARGAR INVENTARIO AUTOMÁTICAMENTE
-# ==================================================
-
-if st.session_state.inventario is None:
-    if os.path.exists(RUTA_EXCEL):
-        try:
-            st.session_state.inventario = cargar_excel(RUTA_EXCEL)
-
-            st.session_state.nombre_archivo = "inventario.xlsx"
-
-        except Exception as error:
-            st.error(f"Error cargando el inventario guardado: {error}")
 
 
 # ==================================================
@@ -92,12 +73,6 @@ with st.expander("📄 Actualizar inventario del día"):
         ):
             try:
                 nuevo_inventario = cargar_excel(archivo)
-
-                with open(
-                    RUTA_EXCEL,
-                    "wb",
-                ) as destino:
-                    destino.write(archivo.getbuffer())
 
                 st.session_state.inventario = nuevo_inventario
 
