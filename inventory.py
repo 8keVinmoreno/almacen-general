@@ -7,15 +7,17 @@ def limpiar_texto(valor):
 
 
 # ==================================================
-# BUSCAR SKU
+# BUSCAR MATERIAL
 # ==================================================
 
 
-def buscar_sku(inventario, sku):
+def buscar_material(inventario, material):
 
-    sku_busqueda = limpiar_texto(sku)
+    material_busqueda = limpiar_texto(material)
 
-    resultado = inventario[inventario["SKU"].astype(str).str.strip() == sku_busqueda]
+    resultado = inventario[
+        inventario["Material"].astype(str).str.strip() == material_busqueda
+    ]
 
     return resultado
 

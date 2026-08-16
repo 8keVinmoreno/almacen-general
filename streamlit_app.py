@@ -1,27 +1,33 @@
 import os
+
 import streamlit as st
 import pandas as pd
 
 from reports import generar_excel
-
 from excel import cargar_excel
 
 from database import (
     crear_base_datos,
     guardar_conteo,
-    linea_ya_contada,
-    ver_conteos,
+    obtener_todos_los_conteos,
     limpiar_conteos,
 )
 
-from inventory import buscar_sku, total_lineas_excel
+from inventory import (
+    buscar_material,
+    total_lineas_excel,
+)
 
 
 # ==================================================
 # CONFIGURACIÓN
 # ==================================================
 
-st.set_page_config(page_title="Almacén General", page_icon="📦", layout="wide")
+st.set_page_config(
+    page_title="Almacén General",
+    page_icon="📦",
+    layout="wide",
+)
 
 crear_base_datos()
 
@@ -74,15 +80,23 @@ with st.expander("📄 Actualizar inventario del día"):
         "un Excel actualizado."
     )
 
-    archivo = st.file_uploader("Seleccionar Excel", type=["xlsx"])
+    archivo = st.file_uploader(
+        "Seleccionar Excel",
+        type=["xlsx"],
+    )
 
     if archivo is not None:
-        if st.button("📥 Usar este inventario", type="primary"):
+        if st.button(
+            "📥 Usar este inventario",
+            type="primary",
+        ):
             try:
                 nuevo_inventario = cargar_excel(archivo)
 
-                # Guardar físicamente el Excel nuevo
-                with open(RUTA_EXCEL, "wb") as destino:
+                with open(
+                    RUTA_EXCEL,
+                    "wb",
+                ) as destino:
                     destino.write(archivo.getbuffer())
 
                 st.session_state.inventario = nuevo_inventario
@@ -116,6 +130,66 @@ st.write(f"📄 **Inventario actual:** {st.session_state.nombre_archivo}")
 
 
 # ==================================================
+# CARGAR TODOS LOS CONTEOS UNA SOLA VEZ
+# ==================================================
+
+datos_conteos = obtener_todos_los_conteos()
+
+
+# ==================================================
+# CREAR DICCIONARIO DE CONTEOS
+# ==================================================
+
+conteos_dict = {}
+
+for registro in datos_conteos:
+    (
+        material,
+        lote,
+        texto_breve_material,
+        parte_numero,
+        ubic_wm,
+        fe_caduc_fe_prefer_cons,
+        stock_disponible,
+        conteo_fisico,
+        diferencia,
+        observacion,
+    ) = registro
+
+    clave = (
+        str(material),
+        str(lote),
+        str(ubic_wm),
+    )
+
+    conteos_dict[clave] = {
+        "conteo_fisico": conteo_fisico,
+        "diferencia": diferencia,
+        "observacion": observacion or "",
+    }
+
+
+# ==================================================
+# OBTENER CONTEO DESDE MEMORIA
+# ==================================================
+
+
+def obtener_conteo_memoria(
+    material,
+    lote,
+    ubic_wm,
+):
+
+    clave = (
+        str(material),
+        str(lote),
+        str(ubic_wm),
+    )
+
+    return conteos_dict.get(clave)
+
+
+# ==================================================
 # CALCULAR PROGRESO
 # ==================================================
 
@@ -124,14 +198,21 @@ total = total_lineas_excel(inventario)
 lineas_contadas = 0
 
 
-for indice, fila in inventario.iterrows():
-    contado = linea_ya_contada(fila["SKU"], fila["Lote"], fila["Ubicacion"])
+for _, fila in inventario.iterrows():
+    clave = (
+        str(fila["Material"]),
+        str(fila["Lote"]),
+        str(fila["Ubic WM"]),
+    )
 
-    if contado:
+    if clave in conteos_dict:
         lineas_contadas += 1
 
 
-pendientes = max(total - lineas_contadas, 0)
+pendientes = max(
+    total - lineas_contadas,
+    0,
+)
 
 
 if total > 0:
@@ -141,7 +222,10 @@ else:
     porcentaje = 0
 
 
-porcentaje = min(porcentaje, 1.0)
+porcentaje = min(
+    porcentaje,
+    1.0,
+)
 
 
 # ==================================================
@@ -157,19 +241,31 @@ col1, col2, col3, col4 = st.columns(4)
 
 
 with col1:
-    st.metric("Total líneas", total)
+    st.metric(
+        "Total líneas",
+        total,
+    )
 
 
 with col2:
-    st.metric("Contadas", lineas_contadas)
+    st.metric(
+        "Contadas",
+        lineas_contadas,
+    )
 
 
 with col3:
-    st.metric("Pendientes", pendientes)
+    st.metric(
+        "Pendientes",
+        pendientes,
+    )
 
 
 with col4:
-    st.metric("Avance", f"{porcentaje * 100:.1f}%")
+    st.metric(
+        "Avance",
+        f"{porcentaje * 100:.1f}%",
+    )
 
 
 st.progress(porcentaje)
@@ -185,39 +281,41 @@ st.divider()
 with st.expander(f"📋 Ver líneas pendientes ({pendientes})"):
     lineas_pendientes = []
 
-    for indice, fila in inventario.iterrows():
-        contado = linea_ya_contada(fila["SKU"], fila["Lote"], fila["Ubicacion"])
+    for _, fila in inventario.iterrows():
+        clave = (
+            str(fila["Material"]),
+            str(fila["Lote"]),
+            str(fila["Ubic WM"]),
+        )
+
+        contado = conteos_dict.get(clave)
 
         if not contado:
-            caducidad = fila["Caducidad"]
+            fecha = fila["FeCaduc/FePreferCons"]
 
-            # ======================================
-            # FORMATEAR CADUCIDAD
-            # ======================================
+            if pd.isna(fecha):
+                fecha_texto = "-"
 
-            if pd.isna(caducidad):
-                caducidad_texto = "-"
-
-            elif hasattr(caducidad, "strftime"):
-                caducidad_texto = caducidad.strftime("%d/%m/%Y")
+            elif hasattr(
+                fecha,
+                "strftime",
+            ):
+                fecha_texto = fecha.strftime("%d/%m/%Y")
 
             else:
-                caducidad_texto = str(caducidad)
+                fecha_texto = str(fecha)
 
             lineas_pendientes.append(
                 {
-                    "SKU": fila["SKU"],
+                    "Material": fila["Material"],
+                    "Texto breve de material": fila["Texto breve de material"],
+                    "Parte Número": fila["Parte Número"],
+                    "Ubic WM": fila["Ubic WM"],
                     "Lote": fila["Lote"],
-                    "Descripción": fila["Descripcion"],
-                    "Ubicación": fila["Ubicacion"],
-                    "Caducidad": caducidad_texto,
-                    "Stock ERP": fila["Stock"],
+                    "FeCaduc/FePreferCons": (fecha_texto),
+                    "stock Disponible": fila["stock Disponible"],
                 }
             )
-
-    # ==============================================
-    # MOSTRAR PENDIENTES
-    # ==============================================
 
     if len(lineas_pendientes) == 0:
         st.success("✅ No quedan líneas pendientes.")
@@ -225,35 +323,45 @@ with st.expander(f"📋 Ver líneas pendientes ({pendientes})"):
     else:
         tabla_pendientes = pd.DataFrame(lineas_pendientes)
 
-        st.dataframe(tabla_pendientes, use_container_width=True, hide_index=True)
+        st.dataframe(
+            tabla_pendientes,
+            use_container_width=True,
+            hide_index=True,
+        )
 
 
 # ==================================================
-# BUSCAR SKU
+# BUSCAR MATERIAL
 # ==================================================
 
 st.divider()
 
-st.subheader("🔍 Buscar SKU")
+st.subheader("🔍 Buscar Material")
 
 
-sku = st.text_input("SKU", placeholder="Ingrese el SKU")
+material = st.text_input(
+    "Material",
+    placeholder="Ingrese el Material",
+)
 
 
 # ==================================================
 # RESULTADO DE BÚSQUEDA
 # ==================================================
 
-if sku:
-    resultado = buscar_sku(inventario, sku)
+if material:
+    resultado = buscar_material(
+        inventario,
+        material,
+    )
 
     if resultado.empty:
-        st.error("❌ SKU no encontrado.")
+        st.error("❌ Material no encontrado.")
 
     else:
-        descripcion = str(resultado.iloc[0]["Descripcion"])
+        descripcion = str(resultado.iloc[0]["Texto breve de material"])
 
-        st.success(f"{sku} - {descripcion}")
+        st.success(f"{material} - {descripcion}")
 
         st.write(f"**Líneas encontradas: {len(resultado)}**")
 
@@ -262,61 +370,74 @@ if sku:
         # ==================================================
 
         for indice, fila in resultado.iterrows():
-            sku_fila = str(fila["SKU"])
+            material_fila = str(fila["Material"])
+
+            texto_material = str(fila["Texto breve de material"])
+
+            parte_numero = str(fila["Parte Número"])
 
             lote = str(fila["Lote"])
 
-            ubicacion = str(fila["Ubicacion"])
+            ubic_wm = str(fila["Ubic WM"])
 
-            descripcion_fila = str(fila["Descripcion"])
+            fecha = fila["FeCaduc/FePreferCons"]
 
-            caducidad = fila["Caducidad"]
-
-            stock = int(fila["Stock"])
+            stock = int(fila["stock Disponible"])
 
             # ==============================================
-            # CADUCIDAD
+            # FORMATEAR FECHA
             # ==============================================
 
-            if pd.isna(caducidad):
-                caducidad_texto = "-"
+            if pd.isna(fecha):
+                fecha_texto = "-"
 
-            elif hasattr(caducidad, "strftime"):
-                caducidad_texto = caducidad.strftime("%d/%m/%Y")
+            elif hasattr(
+                fecha,
+                "strftime",
+            ):
+                fecha_texto = fecha.strftime("%d/%m/%Y")
 
             else:
-                caducidad_texto = str(caducidad)
+                fecha_texto = str(fecha)
 
             # ==============================================
-            # VER SI LA LÍNEA YA FUE CONTADA
+            # BUSCAR CONTEO EN MEMORIA
             # ==============================================
 
-            anterior = linea_ya_contada(sku_fila, lote, ubicacion)
+            anterior = obtener_conteo_memoria(
+                material_fila,
+                lote,
+                ubic_wm,
+            )
 
             # ==============================================
-            # TARJETA DE LA LÍNEA
+            # TARJETA
             # ==============================================
 
             with st.container(border=True):
-                st.write(f"### {descripcion_fila}")
+                st.write(f"### {texto_material}")
+
+                # ==========================================
+                # INFORMACIÓN
+                # ==========================================
 
                 col1, col2 = st.columns(2)
 
-                # ------------------------------------------
-                # INFORMACIÓN
-                # ------------------------------------------
-
                 with col1:
-                    st.write(f"**SKU:** {sku_fila}")
+                    st.write(f"**Material:** {material_fila}")
+
+                    st.write(f"**Texto breve de material:** {texto_material}")
+
+                    st.write(f"**Parte Número:** {parte_numero}")
 
                     st.write(f"**Lote:** {lote}")
 
-                    st.write(f"📍 **Ubicación:** {ubicacion}")
-
                 with col2:
-                    st.write(f"📅 **Caducidad:** {caducidad_texto}")
+                    st.write(f"**Ubic WM:** {ubic_wm}")
 
-                    st.write(f"📦 **Stock ERP:** {stock}")
+                    st.write(f"**FeCaduc/FePreferCons:** {fecha_texto}")
+
+                    st.write(f"**stock Disponible:** {stock}")
 
                 # ==========================================
                 # ESTADO
@@ -325,9 +446,9 @@ if sku:
                 if anterior:
                     st.success("✅ Línea ya contada")
 
-                    valor_inicial = int(anterior[0])
+                    valor_inicial = int(anterior["conteo_fisico"])
 
-                    diferencia_anterior = int(anterior[1])
+                    diferencia_anterior = int(anterior["diferencia"])
 
                     st.write(f"**Diferencia guardada:** {diferencia_anterior:+d}")
 
@@ -337,23 +458,23 @@ if sku:
                     valor_inicial = 0
 
                 # ==========================================
-                # FORMULARIO INDIVIDUAL
+                # FORMULARIO
                 # ==========================================
 
-                with st.form(key=(f"form_{indice}_{sku_fila}_{lote}_{ubicacion}")):
+                with st.form(key=(f"form_{indice}_{material_fila}_{lote}_{ubic_wm}")):
                     conteo = st.number_input(
                         "Conteo físico",
                         min_value=0,
                         value=valor_inicial,
                         step=1,
-                        key=(f"conteo_{indice}_{sku_fila}_{lote}_{ubicacion}"),
+                        key=(f"conteo_{indice}_{material_fila}_{lote}_{ubic_wm}"),
                     )
 
                     observacion = st.text_area(
                         "Observación",
-                        value=anterior[2] if anterior else "",
-                        placeholder="Escribe una observación (opcional)",
-                        key=(f"obs_conteo_{indice}_{sku_fila}_{lote}_{ubicacion}"),
+                        value=(anterior["observacion"] if anterior else ""),
+                        placeholder=("Escribe una observación (opcional)"),
+                        key=(f"obs_conteo_{indice}_{material_fila}_{lote}_{ubic_wm}"),
                     )
 
                     # ======================================
@@ -365,7 +486,7 @@ if sku:
                     st.write(f"**Diferencia:** {diferencia_nueva:+d}")
 
                     # ======================================
-                    # BOTÓN INDIVIDUAL
+                    # GUARDAR
                     # ======================================
 
                     guardar = st.form_submit_button(
@@ -374,17 +495,14 @@ if sku:
                         use_container_width=True,
                     )
 
-                    # ======================================
-                    # GUARDAR SOLO ESTA LÍNEA
-                    # ======================================
-
                     if guardar:
                         guardar_conteo(
-                            sku_fila,
+                            material_fila,
                             lote,
-                            descripcion_fila,
-                            ubicacion,
-                            caducidad_texto,
+                            texto_material,
+                            parte_numero,
+                            ubic_wm,
+                            fecha_texto,
                             stock,
                             conteo,
                             observacion,
@@ -401,35 +519,33 @@ if sku:
 
 st.divider()
 
+
 with st.expander("📋 Ver conteos realizados"):
-    datos = ver_conteos()
+    datos = datos_conteos
 
     if len(datos) == 0:
         st.info("Todavía no hay conteos realizados.")
 
     else:
-        # ==========================================
-        # CREAR TABLA
-        # ==========================================
-
         tabla = pd.DataFrame(
             datos,
             columns=[
-                "SKU",
+                "Material",
                 "Lote",
-                "Descripción",
-                "Ubicación",
-                "Caducidad",
-                "Stock ERP",
+                "Texto breve de material",
+                "Parte Número",
+                "Ubic WM",
+                "FeCaduc/FePreferCons",
+                "stock Disponible",
                 "Conteo físico",
                 "Diferencia",
                 "Observación",
             ],
         )
 
-        # ==========================================
+        # ==============================================
         # FILTRO
-        # ==========================================
+        # ==============================================
 
         filtro = st.selectbox(
             "Mostrar",
@@ -441,10 +557,6 @@ with st.expander("📋 Ver conteos realizados"):
                 "Diferencia negativa",
             ],
         )
-
-        # ==========================================
-        # APLICAR FILTRO
-        # ==========================================
 
         if filtro == "Con diferencia":
             tabla_filtrada = tabla[tabla["Diferencia"] != 0]
@@ -482,7 +594,9 @@ st.divider()
 
 st.subheader("📥 Exportar conteo")
 
-datos = ver_conteos()
+
+datos = datos_conteos
+
 
 if len(datos) == 0:
     st.info("Todavía no hay conteos para exportar.")
@@ -494,9 +608,11 @@ else:
         label="📥 Descargar conteo en Excel",
         data=archivo_excel,
         file_name="Conteo.xlsx",
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        mime=("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
         use_container_width=True,
     )
+
+
 # ==================================================
 # OPCIONES
 # ==================================================
@@ -509,7 +625,10 @@ with st.expander("⚙️ Opciones"):
 
     confirmar = st.checkbox("Confirmo que quiero reiniciar todos los conteos")
 
-    if st.button("🗑️ Reiniciar conteos", use_container_width=True):
+    if st.button(
+        "🗑️ Reiniciar conteos",
+        use_container_width=True,
+    ):
         if confirmar:
             limpiar_conteos()
 

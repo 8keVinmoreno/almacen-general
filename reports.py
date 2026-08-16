@@ -5,12 +5,13 @@ from io import BytesIO
 def generar_excel(datos):
 
     columnas = [
-        "SKU",
+        "Material",
         "Lote",
-        "Descripción",
-        "Ubicación",
-        "Caducidad",
-        "Stock ERP",
+        "Texto breve de material",
+        "Parte Número",
+        "Ubic WM",
+        "FeCaduc/FePreferCons",
+        "stock Disponible",
         "Conteo físico",
         "Diferencia",
         "Observación",
@@ -35,7 +36,8 @@ def generar_excel(datos):
 
         hoja = writer.sheets["Conteo"]
 
-        # Ajustar automáticamente el ancho de las columnas
+        # Ajustar automáticamente el ancho
+        # de las columnas
         for columna in hoja.columns:
             longitud = max(
                 len(str(celda.value)) if celda.value is not None else 0

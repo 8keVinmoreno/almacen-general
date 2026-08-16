@@ -1,9 +1,13 @@
+import os
 import sqlite3
+
 
 RUTA_DB = "data/inventarios.db"
 
 
 def conectar():
+    os.makedirs(os.path.dirname(RUTA_DB), exist_ok=True)
+
     return sqlite3.connect(RUTA_DB)
 
 
@@ -21,21 +25,22 @@ def crear_base_datos():
         CREATE TABLE IF NOT EXISTS conteos (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
 
-            sku TEXT NOT NULL,
+            material TEXT NOT NULL,
             lote TEXT NOT NULL,
-            descripcion TEXT,
-            ubicacion TEXT NOT NULL,
-            caducidad TEXT,
+            texto_breve_material TEXT,
+            parte_numero TEXT,
+            ubic_wm TEXT NOT NULL,
+            fe_caduc_fe_prefer_cons TEXT,
 
-            stock_erp INTEGER,
+            stock_disponible INTEGER,
             conteo_fisico INTEGER,
             diferencia INTEGER,
             observacion TEXT,
 
             UNIQUE (
-                sku,
+                material,
                 lote,
-                ubicacion
+                ubic_wm
             )
         )
     """)
@@ -50,17 +55,18 @@ def crear_base_datos():
 
 
 def guardar_conteo(
-    sku,
+    material,
     lote,
-    descripcion,
-    ubicacion,
-    caducidad,
-    stock_erp,
+    texto_breve_material,
+    parte_numero,
+    ubic_wm,
+    fe_caduc_fe_prefer_cons,
+    stock_disponible,
     conteo_fisico,
     observacion="",
 ):
 
-    diferencia = int(conteo_fisico) - int(stock_erp)
+    diferencia = int(conteo_fisico) - int(stock_disponible)
 
     conexion = conectar()
     cursor = conexion.cursor()
@@ -69,27 +75,33 @@ def guardar_conteo(
         """
         SELECT id
         FROM conteos
-        WHERE sku = ?
+
+        WHERE material = ?
         AND lote = ?
-        AND ubicacion = ?
+        AND ubic_wm = ?
         """,
         (
-            str(sku),
+            str(material),
             str(lote),
-            str(ubicacion),
+            str(ubic_wm),
         ),
     )
 
     registro = cursor.fetchone()
+
+    # ==================================================
+    # ACTUALIZAR
+    # ==================================================
 
     if registro:
         cursor.execute(
             """
             UPDATE conteos
 
-            SET descripcion = ?,
-                caducidad = ?,
-                stock_erp = ?,
+            SET texto_breve_material = ?,
+                parte_numero = ?,
+                fe_caduc_fe_prefer_cons = ?,
+                stock_disponible = ?,
                 conteo_fisico = ?,
                 diferencia = ?,
                 observacion = ?
@@ -97,43 +109,50 @@ def guardar_conteo(
             WHERE id = ?
             """,
             (
-                descripcion,
-                str(caducidad),
-                int(stock_erp),
+                str(texto_breve_material),
+                str(parte_numero),
+                str(fe_caduc_fe_prefer_cons),
+                int(stock_disponible),
                 int(conteo_fisico),
                 diferencia,
-                observacion,
+                str(observacion),
                 registro[0],
             ),
         )
+
+    # ==================================================
+    # INSERTAR
+    # ==================================================
 
     else:
         cursor.execute(
             """
             INSERT INTO conteos (
-                sku,
+                material,
                 lote,
-                descripcion,
-                ubicacion,
-                caducidad,
-                stock_erp,
+                texto_breve_material,
+                parte_numero,
+                ubic_wm,
+                fe_caduc_fe_prefer_cons,
+                stock_disponible,
                 conteo_fisico,
                 diferencia,
                 observacion
             )
 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
-                str(sku),
+                str(material),
                 str(lote),
-                descripcion,
-                str(ubicacion),
-                str(caducidad),
-                int(stock_erp),
+                str(texto_breve_material),
+                str(parte_numero),
+                str(ubic_wm),
+                str(fe_caduc_fe_prefer_cons),
+                int(stock_disponible),
                 int(conteo_fisico),
                 diferencia,
-                observacion,
+                str(observacion),
             ),
         )
 
@@ -142,11 +161,46 @@ def guardar_conteo(
 
 
 # ==================================================
+# OBTENER TODOS LOS CONTEOS
+# ==================================================
+
+
+def obtener_todos_los_conteos():
+
+    conexion = conectar()
+    cursor = conexion.cursor()
+
+    cursor.execute("""
+        SELECT
+            material,
+            lote,
+            texto_breve_material,
+            parte_numero,
+            ubic_wm,
+            fe_caduc_fe_prefer_cons,
+            stock_disponible,
+            conteo_fisico,
+            diferencia,
+            observacion
+
+        FROM conteos
+
+        ORDER BY id
+    """)
+
+    datos = cursor.fetchall()
+
+    conexion.close()
+
+    return datos
+
+
+# ==================================================
 # SABER SI UNA LÍNEA YA FUE CONTADA
 # ==================================================
 
 
-def linea_ya_contada(sku, lote, ubicacion):
+def linea_ya_contada(material, lote, ubic_wm):
 
     conexion = conectar()
     cursor = conexion.cursor()
@@ -160,14 +214,14 @@ def linea_ya_contada(sku, lote, ubicacion):
 
         FROM conteos
 
-        WHERE sku = ?
+        WHERE material = ?
         AND lote = ?
-        AND ubicacion = ?
+        AND ubic_wm = ?
         """,
         (
-            str(sku),
+            str(material),
             str(lote),
-            str(ubicacion),
+            str(ubic_wm),
         ),
     )
 
@@ -185,31 +239,7 @@ def linea_ya_contada(sku, lote, ubicacion):
 
 def ver_conteos():
 
-    conexion = conectar()
-    cursor = conexion.cursor()
-
-    cursor.execute("""
-        SELECT
-            sku,
-            lote,
-            descripcion,
-            ubicacion,
-            caducidad,
-            stock_erp,
-            conteo_fisico,
-            diferencia,
-            observacion
-
-        FROM conteos
-
-        ORDER BY id
-    """)
-
-    datos = cursor.fetchall()
-
-    conexion.close()
-
-    return datos
+    return obtener_todos_los_conteos()
 
 
 # ==================================================
