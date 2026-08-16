@@ -6,6 +6,9 @@ from excel import cargar_excel
 
 from database import (
     crear_base_datos,
+    guardar_inventario,
+    obtener_inventario,
+    limpiar_inventario,
     guardar_conteo,
     obtener_todos_los_conteos,
     limpiar_conteos,
@@ -35,10 +38,13 @@ crear_base_datos()
 # ==================================================
 
 if "inventario" not in st.session_state:
-    st.session_state.inventario = None
+    inventario_guardado = obtener_inventario()
+    st.session_state.inventario = inventario_guardado
 
 if "nombre_archivo" not in st.session_state:
-    st.session_state.nombre_archivo = None
+    st.session_state.nombre_archivo = (
+        "Inventario guardado" if st.session_state.inventario is not None else None
+    )
 
 
 # ==================================================
@@ -74,6 +80,10 @@ with st.expander("📄 Actualizar inventario del día"):
             try:
                 nuevo_inventario = cargar_excel(archivo)
 
+                # Guardar inventario permanentemente en SQLite
+                guardar_inventario(nuevo_inventario)
+
+                # Actualizar memoria de la sesión
                 st.session_state.inventario = nuevo_inventario
 
                 st.session_state.nombre_archivo = archivo.name
