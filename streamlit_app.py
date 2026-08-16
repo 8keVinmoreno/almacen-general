@@ -292,13 +292,13 @@ with st.expander(f"📋 Ver líneas pendientes ({pendientes})"):
 
             lineas_pendientes.append(
                 {
-                    "Material": fila["Material"],
-                    "Texto breve de material": fila["Texto breve de material"],
-                    "Parte Número": fila["Parte Número"],
-                    "Ubic WM": fila["Ubic WM"],
-                    "Lote": fila["Lote"],
-                    "FeCaduc/FePreferCons": (fecha_texto),
-                    "stock Disponible": fila["stock Disponible"],
+                    "📦 Material": fila["Material"],
+                    "📝 Descripción": fila["Texto breve de material"],
+                    "🔖 Parte Número": fila["Parte Número"],
+                    "📍 Ubicación": fila["Ubic WM"],
+                    "🏷️ Lote": fila["Lote"],
+                    "📅 Fecha vencimiento": fecha_texto,
+                    "📊 Stock disponible": fila["stock Disponible"],
                 }
             )
 
@@ -399,30 +399,35 @@ if material:
             # TARJETA
             # ==============================================
 
+            # ==============================================
+            # TARJETA DEL MATERIAL
+            # ==============================================
+
             with st.container(border=True):
-                st.write(f"### {texto_material}")
+                # ENCABEZADO
+                st.markdown(f"### 📦 {material_fila} · {texto_material}")
+
+                st.divider()
 
                 # ==========================================
-                # INFORMACIÓN
+                # INFORMACIÓN DEL MATERIAL
                 # ==========================================
 
                 col1, col2 = st.columns(2)
 
                 with col1:
-                    st.write(f"**Material:** {material_fila}")
+                    st.write(f"🔖 **Parte Número:** {parte_numero}")
 
-                    st.write(f"**Texto breve de material:** {texto_material}")
+                    st.write(f"🏷️ **Lote:** {lote}")
 
-                    st.write(f"**Parte Número:** {parte_numero}")
-
-                    st.write(f"**Lote:** {lote}")
+                    st.write(f"📍 **Ubicación:** {ubic_wm}")
 
                 with col2:
-                    st.write(f"**Ubic WM:** {ubic_wm}")
+                    st.write(f"📅 **Fecha vencimiento:** {fecha_texto}")
 
-                    st.write(f"**FeCaduc/FePreferCons:** {fecha_texto}")
+                    st.write(f"📊 **Stock disponible:** {stock}")
 
-                    st.write(f"**stock Disponible:** {stock}")
+                st.divider()
 
                 # ==========================================
                 # ESTADO
@@ -435,10 +440,21 @@ if material:
 
                     diferencia_anterior = int(anterior["diferencia"])
 
-                    st.write(f"**Diferencia guardada:** {diferencia_anterior:+d}")
+                    if diferencia_anterior == 0:
+                        st.success("🟢 Diferencia guardada: 0 — Stock correcto")
+
+                    elif diferencia_anterior > 0:
+                        st.info(
+                            f"🔵 Diferencia guardada: +{diferencia_anterior} — Sobrante"
+                        )
+
+                    else:
+                        st.error(
+                            f"🔴 Diferencia guardada: {diferencia_anterior} — Faltante"
+                        )
 
                 else:
-                    st.warning("🟡 Pendiente")
+                    st.warning("🟡 Pendiente de conteo")
 
                     valor_inicial = 0
 
@@ -446,20 +462,20 @@ if material:
                 # FORMULARIO
                 # ==========================================
 
-                with st.form(key=(f"form_{indice}_{material_fila}_{lote}_{ubic_wm}")):
+                with st.form(key=f"form_{indice}_{material_fila}_{lote}_{ubic_wm}"):
                     conteo = st.number_input(
-                        "Conteo físico",
+                        "🔢 Conteo físico",
                         min_value=0,
                         value=valor_inicial,
                         step=1,
-                        key=(f"conteo_{indice}_{material_fila}_{lote}_{ubic_wm}"),
+                        key=f"conteo_{indice}_{material_fila}_{lote}_{ubic_wm}",
                     )
 
                     observacion = st.text_area(
-                        "Observación",
+                        "📝 Observación",
                         value=(anterior["observacion"] if anterior else ""),
                         placeholder=("Escribe una observación (opcional)"),
-                        key=(f"obs_conteo_{indice}_{material_fila}_{lote}_{ubic_wm}"),
+                        key=f"obs_conteo_{indice}_{material_fila}_{lote}_{ubic_wm}",
                     )
 
                     # ======================================
@@ -468,14 +484,21 @@ if material:
 
                     diferencia_nueva = int(conteo) - int(stock)
 
-                    st.write(f"**Diferencia:** {diferencia_nueva:+d}")
+                    if diferencia_nueva == 0:
+                        st.success("🟢 Diferencia: 0 — Stock correcto")
+
+                    elif diferencia_nueva > 0:
+                        st.info(f"🔵 Diferencia: +{diferencia_nueva} — Sobrante")
+
+                    else:
+                        st.error(f"🔴 Diferencia: {diferencia_nueva} — Faltante")
 
                     # ======================================
                     # GUARDAR
                     # ======================================
 
                     guardar = st.form_submit_button(
-                        "💾 Guardar esta línea",
+                        "💾 Guardar conteo",
                         type="primary",
                         use_container_width=True,
                     )
@@ -493,7 +516,7 @@ if material:
                             observacion,
                         )
 
-                        st.success("✅ Línea guardada correctamente.")
+                        st.success("✅ Conteo guardado correctamente.")
 
                         st.rerun()
 
@@ -515,16 +538,16 @@ with st.expander("📋 Ver conteos realizados"):
         tabla = pd.DataFrame(
             datos,
             columns=[
-                "Material",
-                "Lote",
-                "Texto breve de material",
-                "Parte Número",
-                "Ubic WM",
-                "FeCaduc/FePreferCons",
-                "stock Disponible",
-                "Conteo físico",
+                "📦 Material",
+                "🏷️ Lote",
+                "📝 Descripción",
+                "🔖 Parte Número",
+                "📍 Ubicación",
+                "📅 Fecha vencimiento",
+                "📊 Stock disponible",
+                "🔢 Conteo físico",
                 "Diferencia",
-                "Observación",
+                "📝 Observación",
             ],
         )
 
