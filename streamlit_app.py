@@ -369,7 +369,7 @@ if material:
 
             stock = int(fila["stock Disponible"])
 
-            unidad_medida = str(fila["Unidad medida  base"])
+            unidad_medida = str(fila["Unidad medida base"])
 
             # ==============================================
             # FORMATEAR FECHA
