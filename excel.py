@@ -13,6 +13,7 @@ COLUMNAS_NECESARIAS = [
     "Lote",
     "FeCaduc/FePreferCons",
     "stock Disponible",
+    "Unidad medida base",
 ]
 
 
@@ -87,6 +88,10 @@ def cargar_excel(archivo):
         )
         .fillna(0)
         .astype(int)
+    )
+
+    inventario["Unidad medida base"] = (
+        inventario["Unidad medida base"].fillna("").astype(str).str.strip()
     )
 
     return inventario

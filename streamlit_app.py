@@ -369,6 +369,8 @@ if material:
 
             stock = int(fila["stock Disponible"])
 
+            unidad_medida = str(fila["Unidad medida  base"])
+
             # ==============================================
             # FORMATEAR FECHA
             # ==============================================
@@ -426,6 +428,8 @@ if material:
                     st.write(f"📅 **Fecha vencimiento:** {fecha_texto}")
 
                     st.write(f"📊 **Stock disponible:** {stock}")
+
+                    st.write(f"📏 **Unidad de Medida:** {unidad_medida}")
 
                 st.divider()
 
