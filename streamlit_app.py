@@ -79,6 +79,7 @@ with st.expander("📄 Actualizar inventario del día"):
         ):
             try:
                 nuevo_inventario = cargar_excel(archivo)
+                st.write("FILAS LEÍDAS DEL EXCEL:", len(nuevo_inventario))
 
                 # Guardar inventario permanentemente en SQLite
                 guardar_inventario(nuevo_inventario)

@@ -1,21 +1,20 @@
-import os
-import sqlite3
 import pandas as pd
+import streamlit as st
 
-
-RUTA_DB = "data/inventarios.db"
+from supabase import create_client
 
 
 # ==================================================
-# CONECTAR
+# CONEXIÓN SUPABASE
 # ==================================================
 
+SUPABASE_URL = st.secrets["SUPABASE_URL"]
+SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
 
-def conectar():
-
-    os.makedirs(os.path.dirname(RUTA_DB), exist_ok=True)
-
-    return sqlite3.connect(RUTA_DB)
+supabase = create_client(
+    SUPABASE_URL,
+    SUPABASE_KEY,
+)
 
 
 # ==================================================
@@ -24,92 +23,12 @@ def conectar():
 
 
 def crear_base_datos():
-
-    conexion = conectar()
-    cursor = conexion.cursor()
-
-    # ==================================================
-    # TABLA INVENTARIO
-    # ==================================================
-
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS inventario (
-
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-
-            material TEXT,
-
-            texto_breve_material TEXT,
-
-            parte_numero TEXT,
-
-            ubic_wm TEXT,
-
-            lote TEXT,
-
-            fe_caduc_fe_prefer_cons TEXT,
-
-            stock_disponible INTEGER,
-
-            unidad_medida_base TEXT
-
-        )
-    """)
-
-    # ==================================================
-    # ACTUALIZAR BASES DE DATOS ANTIGUAS
-    # ==================================================
-
-    cursor.execute("PRAGMA table_info(inventario)")
-
-    columnas = [fila[1] for fila in cursor.fetchall()]
-
-    if "unidad_medida_base" not in columnas:
-        cursor.execute("""
-            ALTER TABLE inventario
-            ADD COLUMN unidad_medida_base TEXT
-        """)
-
-    # ==================================================
-    # TABLA CONTEOS
-    # ==================================================
-
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS conteos (
-
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-
-            material TEXT NOT NULL,
-
-            lote TEXT NOT NULL,
-
-            texto_breve_material TEXT,
-
-            parte_numero TEXT,
-
-            ubic_wm TEXT NOT NULL,
-
-            fe_caduc_fe_prefer_cons TEXT,
-
-            stock_disponible INTEGER,
-
-            conteo_fisico INTEGER,
-
-            diferencia INTEGER,
-
-            observacion TEXT,
-
-            UNIQUE (
-                material,
-                lote,
-                ubic_wm
-            )
-
-        )
-    """)
-
-    conexion.commit()
-    conexion.close()
+    """
+    Las tablas ya fueron creadas en Supabase.
+    Se mantiene esta función porque
+    streamlit_app.py la utiliza.
+    """
+    pass
 
 
 # ==================================================
@@ -119,19 +38,13 @@ def crear_base_datos():
 
 def guardar_inventario(inventario):
 
-    conexion = conectar()
+    # IMPORTANTE:
+    # Esto solamente reemplaza el inventario.
+    # NO toca la tabla conteos.
 
-    cursor = conexion.cursor()
+    supabase.table("inventario").delete().neq("id", 0).execute()
 
-    # ==================================================
-    # BORRAR INVENTARIO ANTERIOR
-    # ==================================================
-
-    cursor.execute("DELETE FROM inventario")
-
-    # ==================================================
-    # INSERTAR INVENTARIO NUEVO
-    # ==================================================
+    registros = []
 
     for _, fila in inventario.iterrows():
         unidad_medida = fila.get("Unidad medida base", "")
@@ -139,44 +52,27 @@ def guardar_inventario(inventario):
         if pd.isna(unidad_medida):
             unidad_medida = ""
 
-        cursor.execute(
-            """
-            INSERT INTO inventario (
+        registro = {
+            "material": str(fila["Material"]),
+            "texto_breve_material": str(fila["Texto breve de material"]),
+            "parte_numero": str(fila["Parte Número"]),
+            "ubic_wm": str(fila["Ubic WM"]),
+            "lote": str(fila["Lote"]),
+            "fe_caduc_fe_prefer_cons": str(fila["FeCaduc/FePreferCons"]),
+            "stock_disponible": int(fila["stock Disponible"]),
+            "unidad_medida_base": str(unidad_medida),
+        }
 
-                material,
+        registros.append(registro)
 
-                texto_breve_material,
+    # Insertar en grupos de 500
+    tamaño_lote = 500
 
-                parte_numero,
+    for inicio in range(0, len(registros), tamaño_lote):
+        grupo = registros[inicio : inicio + tamaño_lote]
 
-                ubic_wm,
-
-                lote,
-
-                fe_caduc_fe_prefer_cons,
-
-                stock_disponible,
-
-                unidad_medida_base
-
-            )
-
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                str(fila["Material"]),
-                str(fila["Texto breve de material"]),
-                str(fila["Parte Número"]),
-                str(fila["Ubic WM"]),
-                str(fila["Lote"]),
-                str(fila["FeCaduc/FePreferCons"]),
-                int(fila["stock Disponible"]),
-                str(unidad_medida),
-            ),
-        )
-
-    conexion.commit()
-    conexion.close()
+        if grupo:
+            (supabase.table("inventario").insert(grupo).execute())
 
 
 # ==================================================
@@ -186,66 +82,82 @@ def guardar_inventario(inventario):
 
 def obtener_inventario():
 
-    conexion = conectar()
+    todos_los_datos = []
 
-    cursor = conexion.cursor()
+    tamaño_pagina = 1000
+    inicio = 0
 
-    cursor.execute("""
-        SELECT
+    while True:
+        fin = inicio + tamaño_pagina - 1
 
-            material,
+        respuesta = (
+            supabase.table("inventario")
+            .select("*")
+            .order("id")
+            .range(inicio, fin)
+            .execute()
+        )
 
-            texto_breve_material,
+        datos = respuesta.data
 
-            parte_numero,
+        if not datos:
+            break
 
-            ubic_wm,
+        todos_los_datos.extend(datos)
 
-            lote,
+        # Si llegaron menos de 1000,
+        # significa que ya llegamos al final.
+        if len(datos) < tamaño_pagina:
+            break
 
-            fe_caduc_fe_prefer_cons,
+        inicio += tamaño_pagina
 
-            stock_disponible,
-
-            unidad_medida_base
-
-        FROM inventario
-
-        ORDER BY id
-    """)
-
-    datos = cursor.fetchall()
-
-    conexion.close()
-
-    if not datos:
+    if not todos_los_datos:
         return None
 
-    inventario = pd.DataFrame(
-        datos,
-        columns=[
-            "Material",
-            "Texto breve de material",
-            "Parte Número",
-            "Ubic WM",
-            "Lote",
-            "FeCaduc/FePreferCons",
-            "stock Disponible",
-            "Unidad medida base",
-        ],
+    inventario = pd.DataFrame(todos_los_datos)
+
+    inventario = inventario.rename(
+        columns={
+            "material": "Material",
+            "texto_breve_material": "Texto breve de material",
+            "parte_numero": "Parte Número",
+            "ubic_wm": "Ubic WM",
+            "lote": "Lote",
+            "fe_caduc_fe_prefer_cons": "FeCaduc/FePreferCons",
+            "stock_disponible": "stock Disponible",
+            "unidad_medida_base": "Unidad medida base",
+        }
     )
 
     # ==================================================
-    # LIMPIAR UNIDAD DE MEDIDA
+    # ASEGURAR UNIDAD DE MEDIDA
     # ==================================================
+
+    if "Unidad medida base" not in inventario.columns:
+        inventario["Unidad medida base"] = ""
+
+    # ==================================================
+    # LIMPIAR DATOS
+    # ==================================================
+
+    inventario["Material"] = inventario["Material"].fillna("").astype(str).str.strip()
+
+    inventario["Texto breve de material"] = (
+        inventario["Texto breve de material"].fillna("").astype(str).str.strip()
+    )
+
+    inventario["Parte Número"] = (
+        inventario["Parte Número"].fillna("").astype(str).str.strip()
+    )
+
+    inventario["Ubic WM"] = inventario["Ubic WM"].fillna("").astype(str).str.strip()
+
+    inventario["Lote"] = inventario["Lote"].fillna("").astype(str).str.strip()
 
     inventario["Unidad medida base"] = (
         inventario["Unidad medida base"].fillna("").astype(str).str.strip()
     )
-
-    # ==================================================
-    # LIMPIAR STOCK
-    # ==================================================
 
     inventario["stock Disponible"] = (
         pd.to_numeric(
@@ -266,14 +178,7 @@ def obtener_inventario():
 
 def limpiar_inventario():
 
-    conexion = conectar()
-
-    cursor = conexion.cursor()
-
-    cursor.execute("DELETE FROM inventario")
-
-    conexion.commit()
-    conexion.close()
+    supabase.table("inventario").delete().neq("id", 0).execute()
 
 
 # ==================================================
@@ -295,123 +200,47 @@ def guardar_conteo(
 
     diferencia = int(conteo_fisico) - int(stock_disponible)
 
-    conexion = conectar()
-
-    cursor = conexion.cursor()
+    datos = {
+        "material": str(material),
+        "lote": str(lote),
+        "texto_breve_material": str(texto_breve_material),
+        "parte_numero": str(parte_numero),
+        "ubic_wm": str(ubic_wm),
+        "fe_caduc_fe_prefer_cons": str(fe_caduc_fe_prefer_cons),
+        "stock_disponible": int(stock_disponible),
+        "conteo_fisico": int(conteo_fisico),
+        "diferencia": diferencia,
+        "observacion": str(observacion),
+    }
 
     # ==================================================
-    # BUSCAR REGISTRO EXISTENTE
+    # BUSCAR SI YA EXISTE
     # ==================================================
 
-    cursor.execute(
-        """
-        SELECT id
-
-        FROM conteos
-
-        WHERE material = ?
-
-        AND lote = ?
-
-        AND ubic_wm = ?
-        """,
-        (
-            str(material),
-            str(lote),
-            str(ubic_wm),
-        ),
+    respuesta = (
+        supabase.table("conteos")
+        .select("id")
+        .eq("material", str(material))
+        .eq("lote", str(lote))
+        .eq("ubic_wm", str(ubic_wm))
+        .execute()
     )
 
-    registro = cursor.fetchone()
+    registros = respuesta.data
 
     # ==================================================
     # ACTUALIZAR
     # ==================================================
 
-    if registro:
-        cursor.execute(
-            """
-            UPDATE conteos
-
-            SET
-
-                texto_breve_material = ?,
-
-                parte_numero = ?,
-
-                fe_caduc_fe_prefer_cons = ?,
-
-                stock_disponible = ?,
-
-                conteo_fisico = ?,
-
-                diferencia = ?,
-
-                observacion = ?
-
-            WHERE id = ?
-            """,
-            (
-                str(texto_breve_material),
-                str(parte_numero),
-                str(fe_caduc_fe_prefer_cons),
-                int(stock_disponible),
-                int(conteo_fisico),
-                diferencia,
-                str(observacion),
-                registro[0],
-            ),
-        )
+    if registros:
+        (supabase.table("conteos").update(datos).eq("id", registros[0]["id"]).execute())
 
     # ==================================================
     # INSERTAR
     # ==================================================
 
     else:
-        cursor.execute(
-            """
-            INSERT INTO conteos (
-
-                material,
-
-                lote,
-
-                texto_breve_material,
-
-                parte_numero,
-
-                ubic_wm,
-
-                fe_caduc_fe_prefer_cons,
-
-                stock_disponible,
-
-                conteo_fisico,
-
-                diferencia,
-
-                observacion
-
-            )
-
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                str(material),
-                str(lote),
-                str(texto_breve_material),
-                str(parte_numero),
-                str(ubic_wm),
-                str(fe_caduc_fe_prefer_cons),
-                int(stock_disponible),
-                int(conteo_fisico),
-                diferencia,
-                str(observacion),
-            ),
-        )
-
-    conexion.commit()
-    conexion.close()
+        (supabase.table("conteos").insert(datos).execute())
 
 
 # ==================================================
@@ -421,86 +250,81 @@ def guardar_conteo(
 
 def obtener_todos_los_conteos():
 
-    conexion = conectar()
-
-    cursor = conexion.cursor()
-
-    cursor.execute("""
-        SELECT
-
+    respuesta = (
+        supabase.table("conteos")
+        .select(
+            """
             material,
-
             lote,
-
             texto_breve_material,
-
             parte_numero,
-
             ubic_wm,
-
             fe_caduc_fe_prefer_cons,
-
             stock_disponible,
-
             conteo_fisico,
-
             diferencia,
-
             observacion
-
-        FROM conteos
-
-        ORDER BY id
-    """)
-
-    datos = cursor.fetchall()
-
-    conexion.close()
-
-    return datos
-
-
-# ==================================================
-# SABER SI UNA LÍNEA YA FUE CONTADA
-# ==================================================
-
-
-def linea_ya_contada(material, lote, ubic_wm):
-
-    conexion = conectar()
-
-    cursor = conexion.cursor()
-
-    cursor.execute(
-        """
-        SELECT
-
-            conteo_fisico,
-
-            diferencia,
-
-            observacion
-
-        FROM conteos
-
-        WHERE material = ?
-
-        AND lote = ?
-
-        AND ubic_wm = ?
-        """,
-        (
-            str(material),
-            str(lote),
-            str(ubic_wm),
-        ),
+            """
+        )
+        .order("id")
+        .execute()
     )
 
-    resultado = cursor.fetchone()
+    datos = respuesta.data
 
-    conexion.close()
+    resultado = []
+
+    for fila in datos:
+        resultado.append(
+            (
+                fila.get("material", ""),
+                fila.get("lote", ""),
+                fila.get("texto_breve_material", ""),
+                fila.get("parte_numero", ""),
+                fila.get("ubic_wm", ""),
+                fila.get("fe_caduc_fe_prefer_cons", ""),
+                fila.get("stock_disponible", 0),
+                fila.get("conteo_fisico", 0),
+                fila.get("diferencia", 0),
+                fila.get("observacion", ""),
+            )
+        )
 
     return resultado
+
+
+# ==================================================
+# VERIFICAR SI UNA LÍNEA YA FUE CONTADA
+# ==================================================
+
+
+def linea_ya_contada(
+    material,
+    lote,
+    ubic_wm,
+):
+
+    respuesta = (
+        supabase.table("conteos")
+        .select("conteo_fisico, diferencia, observacion")
+        .eq("material", str(material))
+        .eq("lote", str(lote))
+        .eq("ubic_wm", str(ubic_wm))
+        .execute()
+    )
+
+    datos = respuesta.data
+
+    if not datos:
+        return None
+
+    fila = datos[0]
+
+    return (
+        fila.get("conteo_fisico", 0),
+        fila.get("diferencia", 0),
+        fila.get("observacion", ""),
+    )
 
 
 # ==================================================
@@ -520,11 +344,4 @@ def ver_conteos():
 
 def limpiar_conteos():
 
-    conexion = conectar()
-
-    cursor = conexion.cursor()
-
-    cursor.execute("DELETE FROM conteos")
-
-    conexion.commit()
-    conexion.close()
+    supabase.table("conteos").delete().neq("id", 0).execute()
