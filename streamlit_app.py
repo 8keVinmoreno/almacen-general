@@ -51,7 +51,7 @@ if "nombre_archivo" not in st.session_state:
 # ENCABEZADO
 # ==================================================
 
-st.title("📦 Almacén General")
+st.title("📦 Almacén Aeronautico CACOM-5")
 
 st.caption("Sistema de conteo físico de inventario")
 
