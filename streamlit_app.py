@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+from postgrest.exceptions import APIError
 
 from reports import generar_excel
 from excel import cargar_excel
@@ -18,6 +19,21 @@ from inventory import (
     buscar_material,
     total_lineas_excel,
 )
+
+
+def guardar_conteo_con_diagnostico(*args):
+    """Guarda un conteo y muestra la respuesta útil de PostgREST si falla."""
+    try:
+        guardar_conteo(*args)
+    except APIError as error:
+        detalle = "\n".join(
+            f"{campo}: {getattr(error, campo, '')}"
+            for campo in ("code", "message", "details", "hint")
+            if getattr(error, campo, None)
+        )
+        st.error("No se pudo guardar el conteo en Supabase.")
+        st.code(detalle or str(error), language="text")
+        st.stop()
 
 
 # ==================================================
@@ -509,7 +525,7 @@ if material:
                     )
 
                     if guardar:
-                        guardar_conteo(
+                        guardar_conteo_con_diagnostico(
                             material_fila,
                             lote,
                             texto_material,

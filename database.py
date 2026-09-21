@@ -198,7 +198,16 @@ def guardar_conteo(
     observacion="",
 ):
 
-    diferencia = float(conteo_fisico) - float(stock_disponible)
+    stock = float(stock_disponible)
+    diferencia = float(conteo_fisico) - stock
+    # La columna existente puede ser SMALLINT. Enviar un entero cuando no hay
+    # decimales evita valores como 12.0, que PostgreSQL rechaza para ese tipo.
+    stock_para_guardar = int(stock) if stock.is_integer() else stock
+    # La columna existente puede ser INTEGER. Enviar un entero cuando no hay
+    # decimales evita valores como -3.0, que PostgreSQL rechaza para ese tipo.
+    diferencia_para_guardar = (
+        int(diferencia) if diferencia.is_integer() else diferencia
+    )
 
     datos = {
         "material": str(material),
@@ -207,9 +216,9 @@ def guardar_conteo(
         "parte_numero": str(parte_numero),
         "ubic_wm": str(ubic_wm),
         "fe_caduc_fe_prefer_cons": str(fe_caduc_fe_prefer_cons),
-        "stock_disponible": float(stock_disponible),
+        "stock_disponible": stock_para_guardar,
         "conteo_fisico": int(conteo_fisico),
-        "diferencia": diferencia,
+        "diferencia": diferencia_para_guardar,
         "observacion": str(observacion),
     }
 
