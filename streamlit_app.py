@@ -132,7 +132,7 @@ for registro in datos_conteos:
     (
         material,
         lote,
-        texto_breve_material,
+        descripcion_del_material,
         parte_numero,
         ubic_wm,
         fe_caduc_fe_prefer_cons,
@@ -294,7 +294,7 @@ with st.expander(f"📋 Ver líneas pendientes ({pendientes})"):
             lineas_pendientes.append(
                 {
                     "📦 Material": fila["Material"],
-                    "📝 Descripción": fila["Texto breve de material"],
+                    "📝 Descripción": fila["Descripción del material"],
                     "🔖 Parte Número": fila["Parte Número"],
                     "📍 Ubicación": fila["Ubic WM"],
                     "🏷️ Lote": fila["Lote"],
@@ -345,7 +345,7 @@ if material:
         st.error("❌ Material no encontrado.")
 
     else:
-        descripcion = str(resultado.iloc[0]["Texto breve de material"])
+        descripcion = str(resultado.iloc[0]["Descripción del material"])
 
         st.success(f"{material} - {descripcion}")
 
@@ -358,7 +358,7 @@ if material:
         for indice, fila in resultado.iterrows():
             material_fila = str(fila["Material"])
 
-            texto_material = str(fila["Texto breve de material"])
+            texto_material = str(fila["Descripción del material"])
 
             parte_numero = str(fila["Parte Número"])
 
@@ -368,7 +368,7 @@ if material:
 
             fecha = fila["FeCaduc/FePreferCons"]
 
-            stock = int(fila["stock Disponible"])
+            stock = float(fila["stock Disponible"])
 
             unidad_medida = str(fila["Unidad medida base"])
 
@@ -428,7 +428,7 @@ if material:
                 with col2:
                     st.write(f"📅 **Fecha vencimiento:** {fecha_texto}")
 
-                    st.write(f"📊 **Stock disponible:** {stock}")
+                    st.write(f"📊 **Stock disponible:** {stock:g}")
 
                     st.write(f"📏 **Unidad de Medida:** {unidad_medida}")
 
@@ -443,7 +443,7 @@ if material:
 
                     valor_inicial = int(anterior["conteo_fisico"])
 
-                    diferencia_anterior = int(anterior["diferencia"])
+                    diferencia_anterior = float(anterior["diferencia"])
 
                     if diferencia_anterior == 0:
                         st.success("🟢 Diferencia guardada: 0 — Stock correcto")
@@ -487,7 +487,7 @@ if material:
                     # DIFERENCIA
                     # ======================================
 
-                    diferencia_nueva = int(conteo) - int(stock)
+                    diferencia_nueva = float(conteo) - stock
 
                     if diferencia_nueva == 0:
                         st.success("🟢 Diferencia: 0 — Stock correcto")
@@ -637,17 +637,24 @@ with st.expander("⚙️ Opciones"):
     st.warning("Reiniciar los conteos eliminará todo el trabajo realizado.")
 
     confirmar = st.checkbox("Confirmo que quiero reiniciar todos los conteos")
+    clave_eliminar_conteos = st.text_input(
+        "Digite la clave para eliminar los conteos",
+        type="password",
+    )
 
     if st.button(
         "🗑️ Reiniciar conteos",
         use_container_width=True,
     ):
-        if confirmar:
+        if not confirmar:
+            st.warning("⚠️ Debes confirmar primero.")
+
+        elif clave_eliminar_conteos != "1234":
+            st.error("❌ La clave es incorrecta. Los conteos no fueron eliminados.")
+
+        else:
             limpiar_conteos()
 
             st.success("✅ Conteos eliminados.")
 
             st.rerun()
-
-        else:
-            st.warning("⚠️ Debes confirmar primero.")

@@ -54,12 +54,12 @@ def guardar_inventario(inventario):
 
         registro = {
             "material": str(fila["Material"]),
-            "texto_breve_material": str(fila["Texto breve de material"]),
+            "descripcion_del_material": str(fila["Descripción del material"]),
             "parte_numero": str(fila["Parte Número"]),
             "ubic_wm": str(fila["Ubic WM"]),
             "lote": str(fila["Lote"]),
             "fe_caduc_fe_prefer_cons": str(fila["FeCaduc/FePreferCons"]),
-            "stock_disponible": int(fila["stock Disponible"]),
+            "stock_disponible": float(fila["stock Disponible"]),
             "unidad_medida_base": str(unidad_medida),
         }
 
@@ -120,7 +120,7 @@ def obtener_inventario():
     inventario = inventario.rename(
         columns={
             "material": "Material",
-            "texto_breve_material": "Texto breve de material",
+            "descripcion_del_material": "Descripción del material",
             "parte_numero": "Parte Número",
             "ubic_wm": "Ubic WM",
             "lote": "Lote",
@@ -143,8 +143,8 @@ def obtener_inventario():
 
     inventario["Material"] = inventario["Material"].fillna("").astype(str).str.strip()
 
-    inventario["Texto breve de material"] = (
-        inventario["Texto breve de material"].fillna("").astype(str).str.strip()
+    inventario["Descripción del material"] = (
+        inventario["Descripción del material"].fillna("").astype(str).str.strip()
     )
 
     inventario["Parte Número"] = (
@@ -165,7 +165,7 @@ def obtener_inventario():
             errors="coerce",
         )
         .fillna(0)
-        .astype(int)
+        .astype(float)
     )
 
     return inventario
@@ -189,7 +189,7 @@ def limpiar_inventario():
 def guardar_conteo(
     material,
     lote,
-    texto_breve_material,
+    descripcion_del_material,
     parte_numero,
     ubic_wm,
     fe_caduc_fe_prefer_cons,
@@ -198,16 +198,16 @@ def guardar_conteo(
     observacion="",
 ):
 
-    diferencia = int(conteo_fisico) - int(stock_disponible)
+    diferencia = float(conteo_fisico) - float(stock_disponible)
 
     datos = {
         "material": str(material),
         "lote": str(lote),
-        "texto_breve_material": str(texto_breve_material),
+        "descripcion_del_material": str(descripcion_del_material),
         "parte_numero": str(parte_numero),
         "ubic_wm": str(ubic_wm),
         "fe_caduc_fe_prefer_cons": str(fe_caduc_fe_prefer_cons),
-        "stock_disponible": int(stock_disponible),
+        "stock_disponible": float(stock_disponible),
         "conteo_fisico": int(conteo_fisico),
         "diferencia": diferencia,
         "observacion": str(observacion),
@@ -256,7 +256,7 @@ def obtener_todos_los_conteos():
             """
             material,
             lote,
-            texto_breve_material,
+            descripcion_del_material,
             parte_numero,
             ubic_wm,
             fe_caduc_fe_prefer_cons,
@@ -279,7 +279,7 @@ def obtener_todos_los_conteos():
             (
                 fila.get("material", ""),
                 fila.get("lote", ""),
-                fila.get("texto_breve_material", ""),
+                fila.get("descripcion_del_material", ""),
                 fila.get("parte_numero", ""),
                 fila.get("ubic_wm", ""),
                 fila.get("fe_caduc_fe_prefer_cons", ""),

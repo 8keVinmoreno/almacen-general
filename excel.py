@@ -7,7 +7,7 @@ import pandas as pd
 
 COLUMNAS_NECESARIAS = [
     "Material",
-    "Texto breve de material",
+    "Descripción del material",
     "Parte Número",
     "Ubic WM",
     "Lote",
@@ -47,8 +47,8 @@ def cargar_excel(archivo):
     # LIMPIAR TEXTO BREVE
     # ==================================================
 
-    inventario["Texto breve de material"] = (
-        inventario["Texto breve de material"].fillna("").astype(str).str.strip()
+    inventario["Descripción del material"] = (
+        inventario["Descripción del material"].fillna("").astype(str).str.strip()
     )
 
     # ==================================================
@@ -87,7 +87,7 @@ def cargar_excel(archivo):
             errors="coerce",
         )
         .fillna(0)
-        .astype(int)
+        .astype(float)
     )
 
     inventario["Unidad medida base"] = (

@@ -7,7 +7,7 @@ def generar_excel(datos):
     columnas = [
         "Material",
         "Lote",
-        "Texto breve de material",
+        "Descripción del material",
         "Parte Número",
         "Ubic WM",
         "FeCaduc/FePreferCons",
