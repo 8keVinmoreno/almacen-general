@@ -367,6 +367,12 @@ if material:
 
         st.write(f"**Líneas encontradas: {len(resultado)}**")
 
+        stock_total = pd.to_numeric(
+            resultado["stock Disponible"], errors="coerce"
+        ).fillna(0).sum()
+
+        st.metric("📊 Stock disponible total", f"{stock_total:g}")
+
         # ==================================================
         # MOSTRAR CADA LÍNEA
         # ==================================================
@@ -457,7 +463,7 @@ if material:
                 if anterior:
                     st.success("✅ Línea ya contada")
 
-                    valor_inicial = int(anterior["conteo_fisico"])
+                    valor_inicial = float(anterior["conteo_fisico"])
 
                     diferencia_anterior = float(anterior["diferencia"])
 
@@ -477,7 +483,7 @@ if material:
                 else:
                     st.warning("🟡 Pendiente de conteo")
 
-                    valor_inicial = 0
+                    valor_inicial = None
 
                 # ==========================================
                 # FORMULARIO
@@ -486,9 +492,10 @@ if material:
                 with st.form(key=f"form_{indice}_{material_fila}_{lote}_{ubic_wm}"):
                     conteo = st.number_input(
                         "🔢 Conteo físico",
-                        min_value=0,
+                        min_value=0.0,
                         value=valor_inicial,
-                        step=1,
+                        step=0.01,
+                        format="%.2f",
                         key=f"conteo_{indice}_{material_fila}_{lote}_{ubic_wm}",
                     )
 
@@ -503,16 +510,19 @@ if material:
                     # DIFERENCIA
                     # ======================================
 
-                    diferencia_nueva = float(conteo) - stock
-
-                    if diferencia_nueva == 0:
-                        st.success("🟢 Diferencia: 0 — Stock correcto")
-
-                    elif diferencia_nueva > 0:
-                        st.info(f"🔵 Diferencia: +{diferencia_nueva} — Sobrante")
-
+                    if conteo is None:
+                        st.info("Ingresa el conteo físico para calcular la diferencia.")
                     else:
-                        st.error(f"🔴 Diferencia: {diferencia_nueva} — Faltante")
+                        diferencia_nueva = float(conteo) - stock
+
+                        if diferencia_nueva == 0:
+                            st.success("🟢 Diferencia: 0 — Stock correcto")
+
+                        elif diferencia_nueva > 0:
+                            st.info(f"🔵 Diferencia: +{diferencia_nueva} — Sobrante")
+
+                        else:
+                            st.error(f"🔴 Diferencia: {diferencia_nueva} — Faltante")
 
                     # ======================================
                     # GUARDAR
@@ -525,21 +535,24 @@ if material:
                     )
 
                     if guardar:
-                        guardar_conteo_con_diagnostico(
-                            material_fila,
-                            lote,
-                            texto_material,
-                            parte_numero,
-                            ubic_wm,
-                            fecha_texto,
-                            stock,
-                            conteo,
-                            observacion,
-                        )
+                        if conteo is None:
+                            st.warning("Debes ingresar un conteo físico antes de guardar.")
+                        else:
+                            guardar_conteo_con_diagnostico(
+                                material_fila,
+                                lote,
+                                texto_material,
+                                parte_numero,
+                                ubic_wm,
+                                fecha_texto,
+                                stock,
+                                conteo,
+                                observacion,
+                            )
 
-                        st.success("✅ Conteo guardado correctamente.")
+                            st.success("✅ Conteo guardado correctamente.")
 
-                        st.rerun()
+                            st.rerun()
 
 
 # ==================================================
